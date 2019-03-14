@@ -1,3 +1,13 @@
+/* IDEA FOR PLAYER TURN INDICATOR: USE NUMBERS, AND LETTER D
+	IE
+	PLAYER 1 -> DISPLAY 1
+	PLAYER 2 -> DISPLAY 2
+	PLAYER 3 -> DISPLAY 3
+	PLAYER 4 -> DISPLAY 4
+	DEALER -> DISPLAY D
+
+*/
+
 module cardgame_21(SW, KEY, HEX0, HEX1, HEX4, HEX5, HEX6, CLOCK_50);
 	input [2:0] SW;
 	input [3:0] KEY;
@@ -8,13 +18,23 @@ module cardgame_21(SW, KEY, HEX0, HEX1, HEX4, HEX5, HEX6, CLOCK_50);
 	output [6:0] HEX5;
 	output [6:0] HEX6;
 	
+	wire [3:0] card;
+	
+	draw_card draw(.in(KEY[2]), .card(card), .clock(CLOCK_50));
+	
+	hex_display_card hex_card(.IN(card), .tens(HEX1), .ones(HEX0));
+	
+	hex_display_card player_score(.IN(score), .tens(HEX5), .ones(HEX4));
+	
+	wire [5:0] score;
+	player_register test_reg(.in(card), .out(score), .clock(CLOCK_50), .reset(reset), .enable(KEY[2]));
+	
 	wire reset;
-	assign reset = ~KEY[0];
+	assign reset = KEY[0];
 	
 endmodule
 
 module control(
-	input enable,
 	input next,
 	//input skip,
 	input reset,
@@ -55,7 +75,7 @@ module control(
 		// By default make output signals 0
 		player = 2'b00;
 		
-		case (current_state)
+		case (current_turn)
 			PLAYER_1_TURN: begin
 				player = 2'b00;
 				end
@@ -72,37 +92,39 @@ module control(
 		endcase
 	end
 	
-	// current_state registers
+	// current_turn registers
 	always @(posedge clock)
 	begin: State_FFs
 		if(reset)
-			current_state <= PLAYER_1_TURN;
+			current_turn <= PLAYER_1_TURN;
 		else
-			current_state <= next_state;
+			current_turn <= next_turn;
 	end
 		
 endmodule
 
-module hex_display(IN, OUT);
-    input [3:0] IN;
-	 output reg [6:0] OUT;
-	 
-	 always @(*)
-	 begin
-		case(IN[3:0])
-			4'b0000: OUT = 7'b1000000;
-			4'b0001: OUT = 7'b1111001;
-			4'b0010: OUT = 7'b0100100;
-			4'b0011: OUT = 7'b0110000;
-			4'b0100: OUT = 7'b0011001;
-			4'b0101: OUT = 7'b0010010;
-			4'b0110: OUT = 7'b0000010;
-			4'b0111: OUT = 7'b1111000;
-			4'b1000: OUT = 7'b0000000;
-			4'b1001: OUT = 7'b0011000;
-			
-			default: OUT = 7'b0111111;
-		endcase
-
+/*TRY TO SET IT SO THAT DRAWING A CARD MOVES TO A NEW STATE IN ORDER TO INCREMENT THE SCORE
+*/
+// Register to store the player score
+module player_register(in, out, clock, reset, enable) ;
+	input clock, reset, enable;
+	input [3:0] in;
+	// Use 6 bits in case someone has a score of 21 (5 bits) and draws a 13, resulting in 34 (6 bits)
+	output reg [5:0] out;
+	
+	// Set initial score to 0
+	initial
+	begin
+		out = 5'b00000;
+	end
+	
+	// Add the value of in to out
+	always @(posedge clock)
+	begin
+		if(reset == 1'b0)
+			out <= 5'b00000;
+		else if(enable == 1'b1)
+			out <= out + {2'b00, in};
 	end
 endmodule
+	

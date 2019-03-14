@@ -1,41 +1,39 @@
-module draw_card(in, out, clock);
+module draw_card(in, card, clock);
 	input in, clock;
-	output reg [3:0] out;
+	output reg [3:0] card;
 	
-	always @(posedge clock)
+	always @(posedge in)
 	begin
-		if(in == 1b'1)
-			out <= counterValue;
-		else
-			out <= 0;
+		card <= counterValue;
 	end
 	
 	wire rateDividerOut;
 	
-	rateDivider RateDivider(.out(rateDividerOut), .clock(clock));
+	rateDivider RateDivider(.q(rateDividerOut), .clock(clock));
 	
-	reg [3:0] counterValue;
-
-	counterUp counter(.out(counterValue), .clock(rateDividerOut));
+	wire [3:0] counterValue;
+	
+	counterUp counter(.num(counterValue), .clock(clock));
+	//counterUp counter(.num(counterValue), .clock(rateDividerOut));
 	
 endmodule
 
-module counterUp(out, clock);
+module counterUp(num, clock);
 	input clock;
-	output reg [3:0] out;
+	output reg [3:0] num;
 	
 	always @(posedge clock)
 	begin
-		if(out == 4b'1011)
-			q <= 4b'0001;
+		if (num == 4'b1101)
+			num <= 4'b0001;
 		else
-			q <= q + 1'b1;
+			num <= num + 1'b1;
 	end
 endmodule
 
-module rateDivider(out, clock);
+module rateDivider(q, clock);
 	input clock;
-	output reg out;
+	output reg q;
 	reg [27:0] counter;
 	
 	initial
