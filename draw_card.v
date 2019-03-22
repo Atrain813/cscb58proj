@@ -1,31 +1,47 @@
-module draw_card(in, card, clock);
-	input in, clock;
+//LOOK INTO LINEAR FEEDBACK SHIFT REGISTER FOR RANDOM NUMBERS
+
+module draw_card(in, card, clock, reset, turn);
+	input in, clock, reset, turn;
 	output reg [3:0] card;
+	
+	reg [5:0] high, low;
+	always @(*)
+	begin
+		case(turn)
+			1'b0: begin
+						high <= 4'b1010;
+						low <= 4'b0001;
+					end
+			1'b1: begin
+						high <= 4'b1001;
+						low <= 4'b0010;
+					end
+		endcase
+	end
 	
 	always @(posedge in)
 	begin
-		card <= counterValue;
+		if(reset == 1'b1)
+			card <= 0;
+		else
+			card <= counterValue;
 	end
-	
-	wire rateDividerOut;
-	
-	rateDivider RateDivider(.q(rateDividerOut), .clock(clock));
 	
 	wire [3:0] counterValue;
 	
-	counterUp counter(.num(counterValue), .clock(clock));
-	//counterUp counter(.num(counterValue), .clock(rateDividerOut));
+	counterUp counter(.num(counterValue), .clock(clock), .high(high), .low(low));
 	
-endmodule
+endmodule	
 
-module counterUp(num, clock);
+module counterUp(num, clock, high, low);
+	input [3:0] high, low;
 	input clock;
 	output reg [3:0] num;
 	
 	always @(posedge clock)
 	begin
-		if (num == 4'b1101)
-			num <= 4'b0001;
+		if (num == high)
+			num <= low;
 		else
 			num <= num + 1'b1;
 	end
