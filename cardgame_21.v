@@ -16,7 +16,7 @@ module cardgame_21(SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, HEX6, HEX7, LEDR
 	wire reset, next, draw, drawing;
 	assign reset = KEY[0];
 	assign next = ~KEY[3];
-	assign draw = KEY[2];
+	assign draw = ~KEY[2];
 	
 	wire [3:0] card_value;
 	wire [1:0] outcome, turn;
@@ -115,10 +115,14 @@ module control(
 	begin: state_table
 		case(current_state)
 			PLAYER_HOLD: begin
-								if(next) next_state = PLAYER_HOLD_WAIT;
-								else if(drawing) next_state = PLAYER_DRAW;
-								else if(outcome == 2'b10) next_state= ENDGAME;
-								else next_state = PLAYER_HOLD;
+								if(next)
+									next_state = PLAYER_HOLD_WAIT;
+								else if(drawing)
+									next_state = PLAYER_DRAW;
+								else if(outcome == 2'b10)
+									next_state= ENDGAME;
+								else
+									next_state = PLAYER_HOLD;
 							end
 			PLAYER_HOLD_WAIT: next_state = next ? PLAYER_HOLD_WAIT: DEALER_TURN;
 			PLAYER_DRAW: next_state = PLAYER_DRAW_WAIT;
@@ -152,6 +156,7 @@ module control(
 					end
 			PLAYER_DRAW_WAIT: begin
 					turn = 2'b00;
+					drawing = 1'b0;
 					end
 			DEALER_TURN: begin
 					turn = 2'b01;
@@ -210,9 +215,9 @@ module datapath(
 	// Operations to keep track of player scores
 	always @(*)
 	begin: operations
-		if(turn == 2'b00 && !reset)
+		if(turn == 2'b00)
 			player_score_cur <= player_score_cur + card;
-		else if(turn == 2'b01 && !reset)
+		else if(turn == 2'b01)
 		begin
 //			while(dealer_score_cur < player_score_cur && dealer_score_cur <= 6'b010101)
 //				dealer_score_cur <= dealer_score_cur + card;
