@@ -55,12 +55,12 @@ module cardgame_21(SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, HEX6, HEX7, LEDR
 						.drawing(drawing),
 						.turn(turn));
 	
-	// DATAPATH MODULEdealer_score_cur
+	// DATAPATH MODULE
 	datapath datapath_module(
 						.clock(CLOCK_50),
 						.reset(reset),
 						.turn(turn),
-						.draw(draw),
+						.draw(drawing),
 						.card_value(card_value),
 						.outcome(outcome),
 						.player_score(player_score),
@@ -115,16 +115,16 @@ module control(
 	
 	reg [4:0] current_state, next_state;
 
-	localparam PLAYER_HOLD = 5'd0,
-				  PLAYER_HOLD_WAIT = 5'd1,
-				  PLAYER_DRAW = 5'd2,
-				  PLAYER_DRAW_WAIT = 5'd3,
-				  DEALER_TURN = 5'd4,
-				  DEALER_DRAW = 5'd5,
-				  ENDGAME = 5'd6,
-//				  WIN = 5'd7
-//				  LOSE = 5'd8
-				  ENDGAME_WAIT = 5'd7;
+	localparam PLAYER_HOLD = 4'd0,
+				  PLAYER_HOLD_WAIT = 4'd1,
+				  PLAYER_DRAW = 4'd2,
+				  PLAYER_DRAW_WAIT = 4'd3,
+				  PLAYER_SCORE_CALC = 4'd4,
+				  DEALER_TURN = 4'd5,
+				  DEALER_DRAW = 4'd6,
+				  DEALER_SCORE_CALC = 4'd7,
+				  ENDGAME = 4'd8,
+				  ENDGAME_WAIT = 4'd9;
 				  
 	initial
 	begin
@@ -145,16 +145,18 @@ module control(
 								else
 									next_state = PLAYER_HOLD;
 							end
-			PLAYER_HOLD_WAIT: next_state = next ? PLAYER_HOLD_WAIT: DEALER_TURN;
-			PLAYER_DRAW: next_state = PLAYER_HOLD; //PLAYER_DRAW_WAIT;
-//			PLAYER_DRAW_WAIT: next_state = drawing ? PLAYER_DRAW_WAIT : PLAYER_HOLD;
+			PLAYER_HOLD_WAIT: next_state = next ? PLAYER_HOLD_WAIT : DEALER_TURN;
+			PLAYER_DRAW: next_state = draw ? PLAYER_DRAW : PLAYER_DRAW_WAIT;
+			PLAYER_DRAW_WAIT: next_state = draw ? PLAYER_DRAW_WAIT : PLAYER_SCORE_CALC;
+			PLAYER_SCORE_CALC: next_state = PLAYER_HOLD;		
 			DEALER_TURN: begin
 								if(outcome != 2'b00)
 									next_state = DEALER_DRAW;
 								else
 									next_state = ENDGAME;
 							end
-			DEALER_DRAW: next_state = DEALER_TURN;
+			DEALER_DRAW: next_state = DEALER_SCORE_CALC;
+			DEALER_SCORE_CALC: next_state = DEALER_TURN;
 			ENDGAME: next_state =  reset ? ENDGAME_WAIT : ENDGAME;
 			ENDGAME_WAIT: next_state = reset ? ENDGAME_WAIT : PLAYER_HOLD;
 			
@@ -173,18 +175,14 @@ module control(
 					turn = 3'b000;
 					drawing = 1'b0;
 					end
-			PLAYER_HOLD_WAIT: begin
-					turn = 3'b000;
-					drawing = 1'b0;
-					end
 			PLAYER_DRAW: begin
 					turn = 3'b001;
 					drawing = 1'b1;
 					end
-//			PLAYER_DRAW_WAIT: begin
-//					turn = 3'b001;
-//					drawing = 1'b0;
-//					end
+			PLAYER_SCORE_CALC: begin
+					turn = 3'b110;
+					drawing = 1'b0;
+					end
 			DEALER_TURN: begin
 					turn = 3'b010;
 					drawing = 1'b0;
@@ -192,6 +190,10 @@ module control(
 			DEALER_DRAW: begin
 					turn = 3'b011;
 					drawing = 1'b1;
+					end
+			DEALER_SCORE_CALC: begin
+					turn = 3'b111;
+					drawing = 1'b0;
 					end
 			ENDGAME: begin
 					turn = 3'b100;
@@ -201,7 +203,6 @@ module control(
 					turn = 3'b100;
 					drawing = 1'b0;
 					end
-
 		endcase
 	end
 	
@@ -246,31 +247,24 @@ module datapath(
 	draw_card Draw_Card(.in(draw), .card(card), .clock(clock), .reset(reset), .turn(1'b0));
 	
 	draw_card turn_counter(.in(draw), .card(dealer_count), .clock(clock), .reset(reset), .turn(1'b1));
-//	// Operations to keep track of player scores
-//	always @(posedge draw)
-//	begin: operations
-////		if(reset)
-////		begin
-////			player_score_cur <= 6'b000000;
-////			dealer_score_cur <= 6'b000000;
-////		end
-////		else
-////				player_score_cur <= player_score_cur + card;
-//				card_value <= card;
-//			end
-//			else if(turn == 3'b011)
-//				dealer_score_cur <= dealer_score_cur + card;
-////		end
-//	
-//			if(turn == 3'b001 && !reset)
-//			begin
-//				player_sccard_value <= card;ore_cur <= player_score_cur + card;
-//				card_value <= card;
-//			end
-//			else if(turn == 3'b011)
-//				dealer_score_cur <= dealer_score_cur + card;
-////		end
-//	end
+	// Operations to keep track of player scores
+	always @(*)
+	begin: operations
+		if(reset)
+		begin
+			player_score_cur <= 6'b0;
+			dealer_score_cur <= 6'b0;
+			card_value <= 3'b0000;
+		end
+		else
+			if(turn == 3'b110)
+			begin
+				player_score_cur <= player_score_cur + card;
+				card_value <= card;
+			end
+			else if(turn == 3'b111)
+				dealer_score_cur <= dealer_score_cur + card;
+	end
 	
 	// Output result
 	always @(posedge clock)
@@ -280,22 +274,11 @@ module datapath(
 			outcome <= 2'b00;
 			player_score <= 6'b0;
 			dealer_score <= 6'b0;
-			player_score_cur <= 6'b0;
-			dealer_score_cur <= 6'b0;
-			card_value <= 3'b0000;
 		end
 		else
 		begin
-			if(turn == 3'b001)
-				player_score_cur <= player_score_cur + card;
-			else if(turn == 3'b011)
-				dealer_score_cur <= dealer_score_cur + card;
-			
 			player_score <= player_score_cur;
 			dealer_score <= dealer_score_cur;
-			
-			if(turn == 3'b001)
-				card_value <= card;
 				
 			if(player_score > 6'b10101  && turn == 3'b000)
 				outcome <= 2'b10;
