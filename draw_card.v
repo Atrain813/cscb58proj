@@ -19,9 +19,9 @@ module draw_card(in, card, clock, reset, turn);
 		endcase
 	end
 	
-	always @(posedge in)
+	always @(posedge clock)
 	begin
-		if(reset == 1'b1)
+		if(reset == 1'b1 || in == 1'b0)
 			card <= 0;
 		else
 			card <= counterValue;
