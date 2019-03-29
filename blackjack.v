@@ -15,7 +15,7 @@ module blackjack(SW, KEY, CLOCK_50, LEDR, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, HE
     wire go;
     
     wire [7:0] money;
-
+    wire [3:0] card;
     wire [7:0] player_total;
     wire [7:0] dealer_total;
     //wire [3:0] card_in;
@@ -39,26 +39,27 @@ module blackjack(SW, KEY, CLOCK_50, LEDR, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, HE
         );
     hex_display_card H32(
         .IN(money[4:0]), 
-        .tens(HEX3)
+        .tens(HEX3),
 	.ones(HEX2)
         );
     hex_display_card H45(
         .IN(dealer_total[4:0]), 
-        .tens(HEX5)
+        .tens(HEX5),
 	.ones(HEX4)
         );
     hex_display_card H67(
         .IN(player_total[4:0]), 
-        .tens(HEX7)
+        .tens(HEX7),
 	.ones(HEX6)
         );
+	draw_card Draw_Card(.in(draw), .card(card), .clock(CLOCK_50), .reset(KEY[1]));
     control C0(
 	.clk(CLOCK_50),
 	.resetn(SW[4]),
 	.hold(SW[17]),
 	.hold_d(hold_d),
 	.go(go),
-
+	.draw(draw)
 	.outcome(outcome), 
 	.ld_card_dealer(ld_card_dealer),
 	.ld_card_player(ld_card_player),
@@ -69,12 +70,13 @@ module blackjack(SW, KEY, CLOCK_50, LEDR, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, HE
 	.clk(CLOCK_50),
 	.resetn(SW[4]),
 	.go(go),
-	.card_in(SW[16:13]),
+	.card_in(card),
 	.bet(SW[3:0]),
 	.ld_card_dealer(ld_card_dealer),
 	.ld_card_player(ld_card_player),
 	.win(win),
 	.lose(lose),
+	.money_out(money),
 	.outcome(outcome),
 	.dealer_total(dealer_total),
 	.player_total(player_total),
@@ -104,6 +106,7 @@ module control(
 		DEALER_DECIDE = 5'b11111,
 		DEALER_DECIDE_WAIT = 5'b11110,
                 DEALER_HOLD     =5'b11100,
+					 EVAL		=5'b00110,
                 WIN       = 5'b00100,
                 LOSE       = 5'b01000;
     initial
@@ -114,18 +117,19 @@ module control(
     always@(*)
     begin: state_table 
             case (current_state)
-                DEALER_DRAW_A: next_state = PLAYER_DRAW_A;
-		PLAYER_DRAW_A: next_state = PLAYER_DRAW_B;
-		PLAYER_DRAW_B: next_state = PLAYER_DECIDE;
-                PLAYER_DECIDE: next_state = go ? PLAYER_DECIDE_WAIT : PLAYER_DECIDE;
-		PLAYER_DECIDE_WAIT: next_state = go ? PLAYER_DECIDE_WAIT : PLAYER_HOLD;
-		PLAYER_HOLD: next_state  = hold ? DEALER_DRAW_B: PLAYER_DRAW_B;
-		DEALER_DRAW_B: next_state = DEALER_DECIDE;
-		DEALER_DECIDE: next_state = go ? DEALER_DECIDE_WAIT : DEALER_DECIDE;
-		DEALER_DECIDE_WAIT: next_state = go ? DEALER_DECIDE_WAIT : DEALER_HOLD;
-                DEALER_HOLD: next_state =  outcome ? WIN : LOSE;
-                WIN: next_state = DEALER_DRAW_A;
-                LOSE: next_state = DEALER_DRAW_A;
+               DEALER_DRAW_A: next_state = PLAYER_DRAW_A;
+					PLAYER_DRAW_A: next_state = PLAYER_DRAW_B;
+					PLAYER_DRAW_B: next_state = PLAYER_DECIDE;
+               PLAYER_DECIDE: next_state = go ? PLAYER_DECIDE_WAIT : PLAYER_DECIDE;
+					PLAYER_DECIDE_WAIT: next_state = go ? PLAYER_DECIDE_WAIT : PLAYER_HOLD;
+					PLAYER_HOLD: next_state  = hold ? DEALER_DRAW_B: PLAYER_DRAW_B;
+					DEALER_DRAW_B: next_state = DEALER_DECIDE;
+					DEALER_DECIDE: next_state = go ? DEALER_DECIDE_WAIT : DEALER_DECIDE;
+					DEALER_DECIDE_WAIT: next_state = go ? DEALER_DECIDE_WAIT : DEALER_HOLD;
+               DEALER_HOLD: next_state =  hold_d ? EVAL : DEALER_DRAW_B;
+					EVAL: next_state =  outcome ? WIN : LOSE;
+               WIN: next_state = DEALER_DRAW_A;
+               LOSE: next_state = DEALER_DRAW_A;
             default:     next_state = DEALER_DRAW_A;
         endcase
     end // state_table
@@ -139,23 +143,23 @@ module control(
         ld_card_dealer = 1'b0;
 	win = 1'b0;
 	lose = 1'b0;
-	//draw = 1'b0;
+	draw = 1'b0;
         case (current_state)
             DEALER_DRAW_A: begin
                 ld_card_dealer = 1'b1;
-		//draw = 1'b1;
+		draw = 1'b1;
                 end
 	    DEALER_DRAW_B: begin
                 ld_card_dealer = 1'b1;
-		//draw = 1'b1;
+		draw = 1'b1;
                 end
             PLAYER_DRAW_A: begin
                 ld_card_player = 1'b1;
-		//draw = 1'b1;
+		draw = 1'b1;
                 end
 	    PLAYER_DRAW_B: begin
                 ld_card_player = 1'b1;
-		//draw = 1'b1;
+		draw = 1'b1;
                 end
             WIN: begin
                 win = 1'b1;
@@ -201,36 +205,37 @@ module datapath(
     //end
     reg [7:0]player_total_temp = 8'b0;
     reg [7:0]dealer_total_temp = 8'b0;
+	 reg [7:0]money = 8'd5;
     always @(*)
     begin: Output_logic
 	 if(!resetn) 
 	 begin
-		    outcome <= 1'b0;
-		    hold_d <= 1'b0;
+		    outcome = 1'b0;
+		    hold_d = 1'b0;
 		end
 		else
 		begin
 	    if(player_total > 8'd21)
-		outcome <= 1'b0;
+		outcome = 1'b0;
 	    else if(dealer_total_temp > 8'd21)
-		outcome <= 1'b1;
+		outcome = 1'b1;
 	    else if(player_total_temp > dealer_total_temp)
-		outcome <= 1'b1;
+		outcome = 1'b1;
 	    else
-		outcome <= 1'b0;
+		outcome = 1'b0;
 	   if(dealer_total_temp >= player_total_temp || player_total_temp > 8'd21)
-		hold_d <= 1'b1;
+		hold_d = 1'b1;
 		else
-		hold_d <= 1'b0;
+		hold_d = 1'b0;
 		if(win)
 		begin
-			outcome <= 1'b0;
-			hold_d <= 1'b0;
+			outcome = 1'b0;
+			hold_d = 1'b0;
 			end
 		if(lose)
 		begin
-			outcome <= 1'b0;
-			hold_d <= 1'b0;
+			outcome = 1'b0;
+			hold_d = 1'b0;
 	   end
 	    end
 		
@@ -262,17 +267,18 @@ module datapath(
 	   begin
 			player_total_temp = 8'b0;
 			dealer_total_temp = 8'b0;
-			money_out <= money + bet;
+			money = money + bet;
 	   end
 	    else if(lose)
 		begin
 			player_total_temp = 8'b0;
 			dealer_total_temp = 8'b0;
-			money_out <= money - bet;
+			money = money - bet;
 	   end 
 	 end
-	 player_total <= player_total_temp;
-	 dealer_total <= dealer_total_temp;
+	 player_total = player_total_temp;
+	 dealer_total = dealer_total_temp;
+	 money_out = money;
 	 end
 endmodule
 
@@ -494,5 +500,36 @@ module hex_display_card(IN, tens, ones);
 							ones = 7'b0111111; // 0
 						end
 		endcase
+	end
+endmodule
+
+module draw_card(in, card, clock);
+	input in, clock;
+	output reg [3:0] card;
+	
+	always @(posedge clock)
+	begin
+		if(in == 1'b1)
+			card <= counterValue;
+	end
+	
+	wire [3:0] counterValue;
+	
+	counterUp counter(.num(counterValue), .clock(clock), .pause(in));
+	
+endmodule	
+
+module counterUp(num, clock, pause);
+	input pause, clock;
+	output reg [3:0] num;
+	
+	always @(posedge clock)
+	begin
+		if (num == 4'b1010)
+			num <= 4'b0001;
+		else if(pause == 1'b1)
+			num <= num + 1'b0;
+		else
+			num <= num + 1'b1;
 	end
 endmodule
