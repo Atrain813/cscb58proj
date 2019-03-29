@@ -29,20 +29,20 @@ module draw_card(in, card, clock, reset, turn);
 	
 	wire [3:0] counterValue;
 	
-	counterUp counter(.num(counterValue), .clock(clock), .high(high), .low(low));
+	counterUp counter(.num(counterValue), .clock(clock), .high(high), .low(low), .pause(in));
 	
 endmodule	
 
-module counterUp(num, clock, high, low);
+module counterUp(num, clock, high, low, pause);
 	input [3:0] high, low;
-	input clock;
+	input pause, clock;
 	output reg [3:0] num;
 	
 	always @(posedge clock)
 	begin
 		if (num == high)
 			num <= low;
-		else
+		else if(pause == 1'b0)
 			num <= num + 1'b1;
 	end
 endmodule
