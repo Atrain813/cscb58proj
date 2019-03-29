@@ -14,6 +14,7 @@ module blackjack(SW, KEY, CLOCK_50, LEDR, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, HE
     wire ld_card_player;
     wire go;
     
+    wire [4:0] state;
     wire [7:0] money;
     wire [3:0] card;
     wire [7:0] player_total;
@@ -22,6 +23,7 @@ module blackjack(SW, KEY, CLOCK_50, LEDR, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, HE
     assign resetn = SW[4];
     assign hold = SW[17];
     assign go = SW[5];
+    assign LEDR[4:0] = state; 
     
     
     //draw_card draw( .in(draw),
@@ -59,7 +61,8 @@ module blackjack(SW, KEY, CLOCK_50, LEDR, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, HE
 	.hold(SW[17]),
 	.hold_d(hold_d),
 	.go(go),
-	.draw(draw)
+	.draw(draw),
+	.state(state)
 	.outcome(outcome), 
 	.ld_card_dealer(ld_card_dealer),
 	.ld_card_player(ld_card_player),
@@ -91,8 +94,8 @@ module control(
     input outcome,
     input go,
     
-    output reg ld_card_dealer,ld_card_player,win,lose
-    //output draw
+    output reg ld_card_dealer,ld_card_player,win,lose,draw
+    output reg [4:0]state
     );
 
     reg [5:0] current_state, next_state; 
@@ -167,7 +170,7 @@ module control(
             LOSE: begin
                 lose = 1'b1;
                 end
-    
+    state <= current_state;
             
         // default:    // don't need default since we already made sure all of our outputs were assigned a value at the start of the always block
         endcase
